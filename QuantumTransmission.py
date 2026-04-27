@@ -12,9 +12,10 @@ m = 0.0665 * (9.1093837139e-31)
 
 # Number of x points
 nx = 500
-
 # Potential region size
 X = 10
+# x0 - potential destribution region linspace
+x0 = np.linspace(0, X, nx)
 
 def expk(ENERGY, i, x, x0, POTENTIAL_DISTRIBUTION):
 	kk = 1e-9 / h * np.sqrt(2 * m * e * (ENERGY - POTENTIAL_DISTRIBUTION[i] + 0j), dtype=np.complex128)
@@ -50,20 +51,20 @@ def S_matrix(ENERGY, i, x0, POTENTIAL_DISTRIBUTION):
 
 	return S
 
-def Transmission_S(ENERGY, LL, D1, D2, D3, D4, V):
+def Transmission_S(ENERGY, PARAM):
 	# Create 2Kx2K matrix by blocks
 	S = np.zeros((2, 2), dtype=np.complex128)
 	Stemp = S
 
-	# x0
-	x0 = np.linspace(0, 5, nx)
+	# x0 - potential destribution region linspace
+	# x0 = np.linspace(0, X, nx) 
 
 	# POTENTIAL_DISTRIBUTION
-	POTENTIAL_DISTRIBUTION = np.linspace(0, 5, nx + 1)
-	POTENTIAL_DISTRIBUTION[0:nx] = x0**2 * (x0 - X)**2 * (x0 - X/3)**2 * (x0 - 2*X/3)**2
-	POTENTIAL_DISTRIBUTION[0] = 0
-	POTENTIAL_DISTRIBUTION[-1] = 0
-	POTENTIAL_DISTRIBUTION = POTENTIAL_DISTRIBUTION / max(POTENTIAL_DISTRIBUTION) * V
+	POTENTIAL_DISTRIBUTION = np.linspace(0, X, nx + 1)
+	POTENTIAL_DISTRIBUTION[0:nx] = x0**2 * (x0 - X)**2 * (x0 - X/3)**2 * (x0 - 2*X/3)**2	# Formula for potential distribution spatial profile
+	POTENTIAL_DISTRIBUTION[0] = 0															# Left end constant potential level
+	POTENTIAL_DISTRIBUTION[-1] = 0															# Right end constant potential level
+	POTENTIAL_DISTRIBUTION = POTENTIAL_DISTRIBUTION / max(POTENTIAL_DISTRIBUTION) * PARAM		# Normalization of potential profile
 
 	S = S_matrix(ENERGY, 0, x0, POTENTIAL_DISTRIBUTION)
 	
@@ -89,12 +90,12 @@ def Transmission_S(ENERGY, LL, D1, D2, D3, D4, V):
 	return np.abs(S[0, 0])**2
 
 def plot_transmission_density(energy_range, param_range, 
-							 num_points=100, log_scale=False, 
-							 n_jobs=-1, backend='loky'):
+							 num_energy_points=100, num_param_points=100,
+							 log_scale=False, n_jobs=-1, backend='loky'):
 		
 	# Create meshgrid for ENERGY and D4
-	energy = np.linspace(energy_range[0], energy_range[1], num_points)
-	param = np.linspace(param_range[0], param_range[1], num_points)
+	energy = np.linspace(energy_range[0], energy_range[1], num_energy_points)
+	param = np.linspace(param_range[0], param_range[1], num_param_points)
 	ENERGY_mesh, PARAM_mesh = np.meshgrid(energy, param)
 	
 	# Flatten the mesh for parallel processing
@@ -107,8 +108,8 @@ def plot_transmission_density(energy_range, param_range,
 	
 	# Parallel computation of transmission values
 	transmission_flat = Parallel(n_jobs=n_jobs, backend=backend)(
-		delayed(Transmission_S)(e, 0.001, 3, 1, 4.312543616657599, 1, d) 
-		for e, d in zip(energy_flat, param_flat)
+		delayed(Transmission_S)(e, p) 
+		for e, p in zip(energy_flat, param_flat)
 	)
 	
 	# Reshape back to 2D
@@ -133,10 +134,10 @@ def plot_transmission_density(energy_range, param_range,
 	cbar.set_label('Transmission', fontsize=12)
 	
 	# Labels and title
-	ax.set_xlabel('ENERGY', fontsize=12)
-	ax.set_ylabel('D4', fontsize=12)
-	ax.set_title(f'Transmission Density Plot (Parallel Computing)\n'
-				f'Grid: {num_points}×{num_points} = {num_points**2} points | '
+	ax.set_xlabel('Energy', fontsize=12)
+	ax.set_ylabel('Parameter', fontsize=12)
+	ax.set_title(f'Transmission Density Plot\n'
+				f'Grid: {num_energy_points}×{num_param_points} = {num_energy_points * num_param_points} points | '
 				f'Cores: {num_cores}', 
 				fontsize=12)
 	
@@ -144,18 +145,19 @@ def plot_transmission_density(energy_range, param_range,
 	plt.show()
 	
 	# Optional: Print computation time info
-	print(f"Computed {num_points**2} points in parallel using {num_cores} cores")
+	print(f"Computed {num_energy_points * num_param_points} points in parallel using {num_cores} cores")
 	
 	return fig, ax, transmission
 
 # Define ranges
-energy_min, energy_max = 0.001, 15
-d_min, d_max = 5, 15
+energy_min, energy_max = 0.001, 15	# Energy range
+param_min, param_max = 5, 15		# Parameters range
 
 # Create the plot
 fig, ax, transmission_data = plot_transmission_density(
 	(energy_min, energy_max),
-	(d_min, d_max),
-	num_points=250,
+	(param_min, param_max),
+	num_energy_points = 500,
+	num_param_points = 50,
 	log_scale=True  # Set to True if transmission values span many orders of magnitude
 )
