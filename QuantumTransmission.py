@@ -4,6 +4,7 @@ from matplotlib.colors import LogNorm
 from joblib import Parallel, delayed
 import multiprocessing
 import mpmath as mp
+from tqdm import tqdm
 
 # Physical constants (SI)
 h = 1.054571817e-34
@@ -109,7 +110,7 @@ def plot_transmission_density(energy_range, param_range,
 	# Parallel computation of transmission values
 	transmission_flat = Parallel(n_jobs=n_jobs, backend=backend)(
 		delayed(Transmission_S)(e, p) 
-		for e, p in zip(energy_flat, param_flat)
+		for e, p in tqdm(zip(energy_flat, param_flat), total=len(energy_flat), desc="Computing transmission") # zip(energy_flat, param_flat)
 	)
 	
 	# Reshape back to 2D
